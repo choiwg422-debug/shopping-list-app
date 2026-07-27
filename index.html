@@ -167,33 +167,37 @@
     </div>
     <ul id="list"></ul>
     <div class="empty" id="emptyMsg" style="display:none;">아직 담긴 아이템이 없어요</div>
+    <div class="empty" id="errorMsg" style="display:none; color: var(--danger);"></div>
   </div>
 </div>
 
-<script>
-const STORAGE_KEY = 'shopping-list-items';
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-function loadItems() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
+const SUPABASE_URL = 'https://indvfolwialqfzcnmeqk.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_jEbNhaNiqnMW-rM0rU_KTw_ELy52GS-';
+const TABLE = 'shopping-items';
 
-function saveItems(items) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-}
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-let items = loadItems();
+let items = [];
 
 const listEl = document.getElementById('list');
 const inputEl = document.getElementById('itemInput');
 const addBtn = document.getElementById('addBtn');
 const statsText = document.getElementById('statsText');
 const emptyMsg = document.getElementById('emptyMsg');
+const errorMsg = document.getElementById('errorMsg');
 const clearCheckedBtn = document.getElementById('clearCheckedBtn');
+
+function showError(message) {
+  errorMsg.textContent = message;
+  errorMsg.style.display = 'block';
+}
+
+function clearError() {
+  errorMsg.style.display = 'none';
+}
 
 function render() {
   listEl.innerHTML = '';
@@ -210,7 +214,7 @@ function render() {
 
     const label = document.createElement('span');
     label.className = 'label';
-    label.textContent = item.text;
+    label.textContent = item.name;
 
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'delete-btn';
@@ -228,32 +232,88 @@ function render() {
   statsText.textContent = `항목 ${items.length}개 (완료 ${checkedCount}개)`;
 }
 
-function addItem() {
-  const text = inputEl.value.trim();
-  if (!text) return;
-  items.push({ id: Date.now() + Math.random(), text, checked: false });
+async function loadItems() {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    showError('목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+    return;
+  }
+  clearError();
+  items = data;
+  render();
+}
+
+async function addItem() {
+  const name = inputEl.value.trim();
+  if (!name) return;
   inputEl.value = '';
-  saveItems(items);
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ name, checked: false })
+    .select()
+    .single();
+
+  if (error) {
+    showError('아이템을 추가하지 못했어요.');
+    return;
+  }
+  clearError();
+  items.push(data);
   render();
   inputEl.focus();
 }
 
-function toggleItem(id) {
+async function toggleItem(id) {
   const item = items.find(i => i.id === id);
-  if (item) item.checked = !item.checked;
-  saveItems(items);
+  if (!item) return;
+  const nextChecked = !item.checked;
+
+  const { error } = await supabase
+    .from(TABLE)
+    .update({ checked: nextChecked })
+    .eq('id', id);
+
+  if (error) {
+    showError('상태를 변경하지 못했어요.');
+    return;
+  }
+  clearError();
+  item.checked = nextChecked;
   render();
 }
 
-function deleteItem(id) {
+async function deleteItem(id) {
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    showError('아이템을 삭제하지 못했어요.');
+    return;
+  }
+  clearError();
   items = items.filter(i => i.id !== id);
-  saveItems(items);
   render();
 }
 
-function clearChecked() {
+async function clearChecked() {
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq('checked', true);
+
+  if (error) {
+    showError('완료 항목을 삭제하지 못했어요.');
+    return;
+  }
+  clearError();
   items = items.filter(i => !i.checked);
-  saveItems(items);
   render();
 }
 
@@ -263,7 +323,7 @@ inputEl.addEventListener('keydown', (e) => {
 });
 clearCheckedBtn.addEventListener('click', clearChecked);
 
-render();
+loadItems();
 </script>
 </body>
 </html>
