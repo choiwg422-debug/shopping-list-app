@@ -171,14 +171,13 @@
   </div>
 </div>
 
-<script type="module">
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
 const SUPABASE_URL = 'https://indvfolwialqfzcnmeqk.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_jEbNhaNiqnMW-rM0rU_KTw_ELy52GS-';
 const TABLE = 'shopping-items';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 let items = [];
 
@@ -233,7 +232,7 @@ function render() {
 }
 
 async function loadItems() {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from(TABLE)
     .select('*')
     .order('created_at', { ascending: true });
@@ -252,7 +251,7 @@ async function addItem() {
   if (!name) return;
   inputEl.value = '';
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from(TABLE)
     .insert({ name, checked: false })
     .select()
@@ -273,7 +272,7 @@ async function toggleItem(id) {
   if (!item) return;
   const nextChecked = !item.checked;
 
-  const { error } = await supabase
+  const { error } = await db
     .from(TABLE)
     .update({ checked: nextChecked })
     .eq('id', id);
@@ -288,7 +287,7 @@ async function toggleItem(id) {
 }
 
 async function deleteItem(id) {
-  const { error } = await supabase
+  const { error } = await db
     .from(TABLE)
     .delete()
     .eq('id', id);
@@ -303,7 +302,7 @@ async function deleteItem(id) {
 }
 
 async function clearChecked() {
-  const { error } = await supabase
+  const { error } = await db
     .from(TABLE)
     .delete()
     .eq('checked', true);
